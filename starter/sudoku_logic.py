@@ -40,12 +40,42 @@ def fill_board(board):
     return True
 
 def remove_cells(board, clues):
+    """Remove cells from a filled board to create a puzzle.
+
+    Cells are removed one at a time, but only kept empty if doing so
+    still leaves the puzzle with exactly one unique solution. If removing
+    a cell would create multiple solutions, the number is restored and a
+    different cell is tried instead. This guarantees every generated
+    puzzle has a single, unique solution.
+    """
+    # Import here to avoid a circular import at module load time,
+    # since solver.py imports from sudoku_logic.py
+    from solver import count_solutions
+
     attempts = SIZE * SIZE - clues
-    while attempts > 0:
+    # Cap total tries to avoid an infinite loop if too few cells are
+    # safely removable for the requested number of clues.
+    max_tries = SIZE * SIZE * 10
+    tries = 0
+
+    while attempts > 0 and tries < max_tries:
+        tries += 1
         row = random.randrange(SIZE)
         col = random.randrange(SIZE)
-        if board[row][col] != EMPTY:
-            board[row][col] = EMPTY
+
+        if board[row][col] == EMPTY:
+            continue
+
+        removed_value = board[row][col]
+        board[row][col] = EMPTY
+
+        # Check uniqueness on a copy so we don't disturb the real board
+        # while counting solutions.
+        board_copy = deep_copy(board)
+        if count_solutions(board_copy, limit=2) != 1:
+            # Removing this cell created multiple solutions; put it back.
+            board[row][col] = removed_value
+        else:
             attempts -= 1
 
 def generate_puzzle(clues=35):
