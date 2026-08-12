@@ -47,14 +47,7 @@ function renderPuzzle(puz) {
   }
 }
 
-async function newGame() {
-  const res = await fetch('/new');
-  const data = await res.json();
-  renderPuzzle(data.puzzle);
-  document.getElementById('message').innerText = '';
-}
-
-async function checkSolution() {
+function getCurrentBoard() {
   const boardDiv = document.getElementById('sudoku-board');
   const inputs = boardDiv.getElementsByTagName('input');
   const board = [];
@@ -66,6 +59,19 @@ async function checkSolution() {
       board[i][j] = val ? parseInt(val, 10) : 0;
     }
   }
+  return board;
+}
+
+async function newGame() {
+  const difficulty = document.getElementById('difficulty').value;
+  const res = await fetch(`/new?difficulty=${difficulty}`);
+  const data = await res.json();
+  renderPuzzle(data.puzzle);
+  document.getElementById('message').innerText = '';
+}
+
+async function checkSolution() {
+  const board = getCurrentBoard();
   const res = await fetch('/check', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -73,20 +79,26 @@ async function checkSolution() {
   });
   const data = await res.json();
   const msg = document.getElementById('message');
+
   if (data.error) {
     msg.style.color = '#d32f2f';
     msg.innerText = data.error;
     return;
   }
-  const incorrect = new Set(data.incorrect.map(x => x[0]*SIZE + x[1]));
+
+  const boardDiv = document.getElementById('sudoku-board');
+  const inputs = boardDiv.getElementsByTagName('input');
+
+  const incorrect = new Set(data.incorrect.map(x => x[0] * SIZE + x[1]));
   for (let idx = 0; idx < inputs.length; idx++) {
     const inp = inputs[idx];
     if (inp.disabled) continue;
-    inp.className = 'sudoku-cell';
+    inp.classList.remove('incorrect');
     if (incorrect.has(idx)) {
-      inp.className = 'sudoku-cell incorrect';
+      inp.classList.add('incorrect');
     }
   }
+
   if (incorrect.size === 0) {
     msg.style.color = '#388e3c';
     msg.innerText = 'Congratulations! You solved it!';
@@ -96,10 +108,36 @@ async function checkSolution() {
   }
 }
 
+async function useHint() {
+  const board = getCurrentBoard();
+  const res = await fetch('/hint', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({board})
+  });
+  const data = await res.json();
+  const msg = document.getElementById('message');
+
+  if (data.error) {
+    msg.style.color = '#d32f2f';
+    msg.innerText = data.error;
+    return;
+  }
+
+  const boardDiv = document.getElementById('sudoku-board');
+  const inputs = boardDiv.getElementsByTagName('input');
+  const idx = data.row * SIZE + data.col;
+  const inp = inputs[idx];
+  inp.value = data.value;
+  inp.disabled = true;
+  inp.classList.add('hinted');
+}
+
 // Wire buttons
 window.addEventListener('load', () => {
   document.getElementById('new-game').addEventListener('click', newGame);
   document.getElementById('check-solution').addEventListener('click', checkSolution);
+  document.getElementById('hint-button').addEventListener('click', useHint);
   // initialize
   newGame();
 });
